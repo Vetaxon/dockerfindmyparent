@@ -1,0 +1,4 @@
+src/
+dumps/dump.sql
+es/nodes
+.idea

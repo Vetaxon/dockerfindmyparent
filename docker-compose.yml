@@ -1,0 +1,116 @@
+version: '3'
+
+networks:
+ findmyparent:
+
+services:
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx-findmyparent
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+      - mysql
+    networks:
+      - findmyparent
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-findmyparent
+    command: --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./dumps:/docker-entrypoint-initdb.d/
+    environment:
+      MYSQL_DATABASE: family_search
+      MYSQL_USER: user
+      MYSQL_PASSWORD: 123321
+      MYSQL_ROOT_PASSWORD: 123321
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    networks:
+      - findmyparent
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: php-findmyparent
+    volumes:
+      - ./src:/var/www/html
+    ports:
+      - "9000:9000"
+    networks:
+      - findmyparent
+
+  composer:
+    image: composer:latest
+    container_name: composer-findmyparent
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    depends_on:
+      - php
+    networks:
+      - findmyparent
+
+  npm:
+    image: node:13.7
+    container_name: npm-findmyparent
+    volumes:
+      - ./src:/var/www/html
+    working_dir: /var/www/html
+    entrypoint: ['npm']
+
+  artisan:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: artisan-findmyparent
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      - mysql
+    working_dir: /var/www/html
+    entrypoint: ['/var/www/html/artisan']
+    networks:
+      - findmyparent
+
+  # TODO: check and run
+  # elasticsearch:
+  #   image: bitnami/elasticsearch:latest
+  #   container_name: elasticsearch
+  #   environment:
+  #     - cluster.name=docker-cluster
+  #     - bootstrap.memory_lock=true
+  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+  #     - http.cors.enabled=true
+  #     - http.cors.allow-origin=*
+  #     - discovery.zen.minimum_master_nodes=2
+  #   ulimits:
+  #     memlock:
+  #       soft: -1
+  #       hard: -1
+  #   volumes:
+  #     - ./es:/usr/share/elasticsearch/data
+  #   ports:
+  #     - 9200:9200
+  #   networks:
+  #     - findmyparent
+
+  # kibana:
+  #   image: library/kibana:7.8.0
+  #   container_name: kibana-findmyparent
+  #   environment: 
+  #     ELASTICSEARCH_HOSTS: http://localhost:9200
+  #   ports:
+  #     - "5601:5601"
+  #   networks:
+  #     - findmyparent
